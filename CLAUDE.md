@@ -9,7 +9,8 @@ relaciones, patrones emocionales y crecimiento personal.
 
 ## Sobre Patricia Robiano
 
-- Instagram: @patrirobiano — 12K+ seguidores, 1,200+ posts
+- Instagram: @patrirobianook — 12K+ seguidores, 1,200+ posts
+- YouTube: /patrirobianook
 - Tema central: Desarrollo Personal, Salud Autogestiva, Metafísica y Emprendimiento Consciente
 - Bio: "Manifestá tus objetivos de forma simple y sostenible"
 - Trayectoria: +30 años, 4 carreras (Lic. en Nutrición, Coach Personal, Psicóloga Social, Psicoanalista)

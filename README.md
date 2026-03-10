@@ -1,6 +1,6 @@
 # Patri Mentor — AI Mentor
 
-AI Mentor basado en las enseñanzas de Patri Robiano.
+AI Mentor basado en las enseñanzas de Patricia Robiano (@patrirobianook).
 Permite consultar su metodología sobre relaciones, patrones emocionales,
 dinámicas familiares y crecimiento personal en tiempo real.
 
