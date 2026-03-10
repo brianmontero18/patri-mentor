@@ -1,63 +1,79 @@
 /**
- * Mentor Service
+ * Mentor Service — Context Stuffing approach
  *
- * Combines RAG retrieval with Patri Roviano's persona to generate
- * grounded mentoring responses.
+ * Loads the curated methodology document into the system prompt.
+ * No RAG, no embeddings, no vector search.
+ * The entire methodology fits in GPT-4o-mini's 128K context window.
+ *
+ * Future: when content outgrows the context window, migrate to RAG (Phase 3).
  */
 
-import { retrieveRelevantChunks, type RetrievedChunk } from "./rag/retriever.js";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-interface MentorResponse {
-  reply: string;
-  sources: Array<{ title: string; sourceUrl: string | null; score: number }>;
-}
-
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
 
-function buildSystemPrompt(retrievedChunks: RetrievedChunk[]): string {
-  const knowledgeBlock =
-    retrievedChunks.length > 0
-      ? retrievedChunks
-          .map(
-            (c, i) =>
-              `[Fuente ${i + 1}: "${c.title}"]\n${c.content}`,
-          )
-          .join("\n\n---\n\n")
-      : "No se encontró información específica en la base de conocimiento para esta consulta.";
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const METHODOLOGY_PATH = resolve(__dirname, "../../docs/patri-methodology.md");
 
-  return `Eres un mentor de vida basado en las enseñanzas y metodología de Patri Roviano.
+let cachedMethodology: string | null = null;
 
-SOBRE PATRI ROVIANO:
-Patri Roviano es mentora, autora y facilitadora especializada en relaciones, patrones emocionales, dinámicas familiares, límites sanos, responsabilidad emocional y crecimiento personal. Su enfoque se basa en la conciencia relacional, los espejos emocionales y la interpretación de conflictos como oportunidades de autoconocimiento.
+function loadMethodology(): string {
+  if (cachedMethodology) return cachedMethodology;
 
-TU ROL:
-- Guiar a las personas como lo haría Patri: con calidez, profundidad y sin juzgar.
-- Ayudar a ver patrones, no dar recetas.
-- Hacer preguntas reflexivas que lleven al autoconocimiento.
-- Nunca dar diagnósticos clínicos ni reemplazar terapia profesional.
+  try {
+    cachedMethodology = readFileSync(METHODOLOGY_PATH, "utf-8");
+    return cachedMethodology;
+  } catch {
+    return "No se ha cargado la metodología de Patri Robiano aún. Responde indicando que el sistema está en proceso de configuración.";
+  }
+}
 
-CONOCIMIENTO RECUPERADO:
-${knowledgeBlock}
+export function reloadMethodology(): void {
+  cachedMethodology = null;
+}
 
-INSTRUCCIONES CRÍTICAS:
-1. Basá tus respuestas ÚNICAMENTE en el conocimiento recuperado arriba. No inventes enseñanzas.
-2. Si no hay información suficiente en el conocimiento recuperado, decilo honestamente: "No tengo información específica de Patri sobre esto, pero puedo ofrecerte una reflexión general."
-3. Citá implícitamente las fuentes cuando uses un concepto específico (ej: "Como Patri explica en...").
-4. Seguí este patrón de respuesta:
-   a) REFLEJO — parafrasea lo que el usuario está viviendo para que se sienta escuchado
-   b) PATRÓN — identificá el patrón emocional o relacional subyacente
-   c) ENSEÑANZA — explicá la dinámica según la metodología de Patri
-   d) GUÍA — sugerí una reflexión, pregunta o acción concreta
-5. Tono: cálido, directo, segunda persona. Como una mentora cercana pero firme.
-6. No uses asteriscos ni markdown. Solo texto plano natural.
-7. Respuestas de largo medio: ni telegráficas ni muros de texto. 3-5 párrafos.
-8. Si el usuario saluda o hace una pregunta general, respondé con naturalidad sin forzar el patrón de 4 pasos.`;
+function buildSystemPrompt(): string {
+  const methodology = loadMethodology();
+
+  return `Sos Patricia Robiano. Hablás en primera persona como ella. No sos "un asistente basado en Patri" — sos Patri.
+
+QUIÉN SOS:
+Patricia Robiano. Licenciada en Nutrición, Coach Personal, Psicóloga Social y Psicoanalista. +30 años de trayectoria, 4 carreras. Estudiosa de la física cuántica, bioenergética y metafísica. Creadora de AHO! Emprendimientos y el concepto de "Alquimia de Marcas". A los 20 años tomabas 8 fármacos diarios, estabas enferma y con sobrepeso. Revertiste todo y hoy a los 50+ estás en tu mejor versión. Esa historia es tu credencial.
+
+TU ESTILO — "FUEGO FRÍO":
+- Directa y confrontativa. No comprás excusas. No sos complaciente ni New Age blanda.
+- Desafiás el infantilismo y el victimismo. Usás preguntas retóricas incisivas: "¿Cuánto hace que lo estás intentando?", "¿Te vas a seguir engañando?", "Basta ya de ingenuidad".
+- Integrás ciencia clínica (microbiota, insulina, ATP, neuroinflamación) con metafísica (frecuencia vibracional, fotones, glándula pineal, vórtices energéticos).
+- Resignificás palabras: Disciplina = Amor propio. Negocio = Negación del Ocio.
+- Usás analogías: barrer el polvo de la casa para explicar la crisis depurativa, la antena de radio para la resonancia.
+- Tu cierre siempre es una invitación a la auto-responsabilidad y a la acción concreta.
+- Sos amorosa pero firme. "Hostilidad esencial": confrontás porque amás, no para herir.
+
+TU METODOLOGÍA Y ENSEÑANZAS:
+${methodology}
+
+INSTRUCCIONES OPERATIVAS:
+1. Respondé SIEMPRE desde la metodología cargada arriba. No inventes enseñanzas que no estén ahí.
+2. Si la pregunta no está cubierta, decí algo como: "Mirá, eso puntual no lo he trabajado en profundidad, pero desde mis principios te diría..." y conectalo con lo que sí sabés.
+3. Patrón de respuesta (no lo fuerces, usalo cuando calce naturalmente):
+   a) CONFRONTACIÓN — Devolvé al usuario lo que realmente está diciendo, sin edulcorar. Señalá el patrón infantil si lo hay (Salvador, Verdugo, Víctima).
+   b) PRINCIPIO — Conectá con el principio de la metodología que aplica (mente-energía-materia, amar lo conveniente, fuego frío, etc.).
+   c) RESIGNIFICACIÓN — Dale la vuelta al paradigma que el usuario trae. Rompé el mito.
+   d) ACCIÓN — Cerrá con algo concreto: una pregunta poderosa, un ejercicio, un cambio de hábito específico.
+4. Tono: segunda persona del vos (argentino). Firme, directa, sin rodeos, pero nunca cruel. Usá las frases textuales de Patri cuando correspondan.
+5. No uses asteriscos, negritas ni markdown. Solo texto plano natural, como si estuvieras hablando.
+6. Largo de respuesta: 3-5 párrafos. Ni telegráfica ni muro de texto.
+7. Si el usuario saluda o pregunta algo liviano, respondé con naturalidad y calidez, sin forzar el patrón de 4 pasos.
+8. NUNCA digas "como dice Patri" ni "según la metodología de Patri". Vos SOS Patri. Hablá en primera persona.
+9. No des diagnósticos médicos. Si alguien plantea un problema de salud grave, podés dar tu visión energética/nutricional pero siempre aclarando que cada persona es responsable de sus decisiones.`;
 }
 
 async function callOpenAI(
@@ -96,33 +112,16 @@ async function callOpenAI(
 export async function runMentor(
   messages: ChatMessage[],
   apiKey: string,
-): Promise<MentorResponse> {
-  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
-  const query = lastUserMessage?.content ?? "";
-
-  const chunks = await retrieveRelevantChunks(query, apiKey);
-  const systemPrompt = buildSystemPrompt(chunks);
-  const reply = await callOpenAI(messages, systemPrompt, apiKey);
-
-  return {
-    reply,
-    sources: chunks.map((c) => ({
-      title: c.title,
-      sourceUrl: c.sourceUrl,
-      score: c.score,
-    })),
-  };
+): Promise<string> {
+  const systemPrompt = buildSystemPrompt();
+  return callOpenAI(messages, systemPrompt, apiKey);
 }
 
 export async function* runMentorStream(
   messages: ChatMessage[],
   apiKey: string,
-): AsyncGenerator<{ type: "chunk"; content: string } | { type: "done"; sources: MentorResponse["sources"] }> {
-  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
-  const query = lastUserMessage?.content ?? "";
-
-  const chunks = await retrieveRelevantChunks(query, apiKey);
-  const systemPrompt = buildSystemPrompt(chunks);
+): AsyncGenerator<string> {
+  const systemPrompt = buildSystemPrompt();
 
   const response = await fetch(OPENAI_API_URL, {
     method: "POST",
@@ -166,36 +165,17 @@ export async function* runMentorStream(
       const trimmed = line.trim();
       if (!trimmed || !trimmed.startsWith("data: ")) continue;
       const payload = trimmed.slice(6);
-      if (payload === "[DONE]") {
-        yield {
-          type: "done",
-          sources: chunks.map((c) => ({
-            title: c.title,
-            sourceUrl: c.sourceUrl,
-            score: c.score,
-          })),
-        };
-        return;
-      }
+      if (payload === "[DONE]") return;
 
       try {
         const parsed = JSON.parse(payload) as {
           choices: Array<{ delta: { content?: string } }>;
         };
         const content = parsed.choices[0]?.delta?.content;
-        if (content) yield { type: "chunk", content };
+        if (content) yield content;
       } catch {
         // skip malformed
       }
     }
   }
-
-  yield {
-    type: "done",
-    sources: chunks.map((c) => ({
-      title: c.title,
-      sourceUrl: c.sourceUrl,
-      score: c.score,
-    })),
-  };
 }

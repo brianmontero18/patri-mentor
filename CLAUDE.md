@@ -2,186 +2,97 @@
 
 ## Contexto
 
-AI Mentor basado en las enseñanzas de Patri Roviano.
+AI Mentor basado en las enseñanzas de Patricia Robiano (@patrirobiano).
 Permite a usuarios interactuar conversacionalmente con un asistente que responde
-según la filosofía, metodología y frameworks de Patri sobre relaciones, patrones
-emocionales, dinámicas familiares y crecimiento personal.
+según su filosofía y metodología sobre desarrollo personal, manifestación,
+relaciones, patrones emocionales y crecimiento personal.
 
-El asistente simula cómo Patri Roviano guiaría a alguien cuando presenta un
-conflicto personal o situación de vida.
+## Sobre Patricia Robiano
+
+- Instagram: @patrirobiano — 12K+ seguidores, 1,200+ posts
+- Tema central: Desarrollo Personal, Salud Autogestiva, Metafísica y Emprendimiento Consciente
+- Bio: "Manifestá tus objetivos de forma simple y sostenible"
+- Trayectoria: +30 años, 4 carreras (Lic. en Nutrición, Coach Personal, Psicóloga Social, Psicoanalista)
+- Background: integración ciencia + psicología + espiritualidad, física cuántica, bioenergética
+- Empresa: AHO! Emprendimientos / "Alquimia de Marcas"
+- Estilo: directo, confrontativo, "fuego frío" — guerrera que no compra excusas
+- Contenido premium en Patreon
 
 ## Stack
 
-- **Frontend**: React 18 + TypeScript + Vite 5
+- **Frontend**: React 18 + TypeScript + Vite 5 (futuro)
 - **Backend**: Node.js / Fastify 5 + SQLite (@libsql/client)
-- **LLM**: GPT-4o-mini (chat + RAG reasoning) — via OpenAI API
-- **Embeddings**: text-embedding-3-small (OpenAI)
-- **Vector Search**: Cosine similarity sobre SQLite (MVP, sin infra externa)
-- **Deploy**: TBD (Fly.io o similar)
+- **LLM**: GPT-4o-mini (chat) — via OpenAI API
+- **Approach**: Context stuffing (metodología en system prompt)
+- **Deploy**: TBD
 
-## Arquitectura
+## Arquitectura (Phase 1 — Context Stuffing)
 
 ```
 patri-mentor/
-├── package.json            ← root: concurrently para dev, build, start
+├── package.json            ← root: concurrently para dev
 ├── CLAUDE.md               ← este archivo
 ├── docs/
-│   └── patri-methodology.md ← metodología estructurada de Patri (curada)
-├── knowledge/               ← fuentes crudas: transcripciones, notas, etc.
+│   └── patri-methodology.md ← metodología curada de Patri (se carga en system prompt)
+├── knowledge/               ← fuentes crudas: transcripciones, notas
 ├── backend/
 │   ├── .env                 ← OPENAI_API_KEY (no commitear)
 │   └── src/
-│       ├── server.ts        ← Entry point. Plugins, DB init, rutas bajo /api
-│       ├── db.ts            ← SQLite: users, knowledge_chunks, conversations
-│       ├── mentor-service.ts ← System prompt Patri + RAG context + LLM
-│       ├── rag/
-│       │   ├── embeddings.ts ← OpenAI embeddings wrapper
-│       │   ├── ingest.ts     ← Chunk + embed content → SQLite
-│       │   └── retriever.ts  ← Vector search (cosine similarity)
+│       ├── server.ts        ← Entry point Fastify :3001
+│       ├── db.ts            ← SQLite: users, conversations
+│       ├── mentor-service.ts ← Carga patri-methodology.md → system prompt → GPT-4o-mini
 │       └── routes/
 │           ├── health.ts     ← GET /api/health
 │           ├── chat.ts       ← POST /api/chat + POST /api/chat/stream (SSE)
-│           ├── knowledge.ts  ← CRUD knowledge base + ingest endpoint
 │           └── users.ts      ← CRUD /api/users
-└── frontend/
-    ├── vite.config.ts       ← Proxy /api → localhost:3001
-    └── src/
-        ├── App.tsx           ← Chat-first UI
-        ├── main.tsx          ← Entry point React
-        ├── index.css         ← Estilos (branding Patri)
-        ├── api.ts            ← Llamadas HTTP
-        └── components/
-            └── ChatView.tsx   ← Chat conversacional
+└── frontend/                ← Phase 3
+```
+
+## Cómo funciona
+
+```
+1. docs/patri-methodology.md contiene la metodología curada de Patri
+2. mentor-service.ts lee ese archivo al iniciar
+3. Cada request de chat construye un system prompt:
+   Persona de Patri + Metodología completa + Instrucciones
+4. GPT-4o-mini genera la respuesta grounded en ese contexto
+5. No hay RAG, no hay embeddings, no hay vector search
 ```
 
 ## Desarrollo
 
 ```bash
-# Desde la raíz (levanta ambos con concurrently)
-npm run dev
-
-# O por separado
 cd backend && npm run dev   # :3001
-cd frontend && npm run dev  # :5174
-
-# Verificar
-curl http://localhost:5174/api/health
-
-# Ingestar conocimiento
-curl -X POST http://localhost:3001/api/knowledge/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"title": "...", "source": "...", "content": "...", "type": "transcript"}'
+curl http://localhost:3001/api/health
 ```
 
-## Flujo de datos
+## Plan progresivo
 
-```
-1. Ingesta de conocimiento:
-   POST /api/knowledge/ingest { title, source, content, type }
-   → Chunking semántico (split por párrafos, ~500 tokens)
-   → OpenAI text-embedding-3-small genera embeddings
-   → Almacena chunks + embeddings en SQLite (knowledge_chunks)
+### Phase 1 — MVP con Context Stuffing (actual)
+- Backend listo (server, chat, streaming)
+- Falta: curar docs/patri-methodology.md con contenido real
+- Fuentes: NotebookLM (transcripciones de YouTube) + contenido de Patri
 
-2. Chat (streaming):
-   POST /api/chat/stream { userId, messages }
-   → Toma último mensaje del usuario
-   → Genera embedding de la query
-   → Busca top-K chunks más relevantes (cosine similarity)
-   → Construye system prompt con contexto RAG + personalidad Patri
-   → GPT-4o-mini genera respuesta grounded en conocimiento
-   → SSE stream de chunks
-   → Guarda en conversations
+### Phase 2 — Frontend + Validación con Patri
+- Chat UI simple
+- Branding alineado a @patrirobiano
+- Mostrar a Patri, iterar
 
-3. Sin userId (anónimo):
-   POST /api/chat/stream { messages }
-   → Misma lógica pero sin persistencia
-```
+### Phase 3 — RAG (si el contenido crece)
+- Migrar a RAG cuando la metodología no quepa en 128K tokens
+- OpenAI Responses API File Search o RAG custom
+- El código de RAG está en `rag/` (scaffoldeado pero no usado)
 
-## API
+## Costos estimados
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/health` | Healthcheck |
-| POST | `/api/chat` | `{ userId?, messages }` → `{ reply, sources }` |
-| POST | `/api/chat/stream` | `{ userId?, messages }` → SSE stream |
-| POST | `/api/knowledge/ingest` | `{ title, source, content, type }` → ingest + embed |
-| GET | `/api/knowledge` | Listar knowledge chunks |
-| DELETE | `/api/knowledge/:id` | Eliminar chunk |
-| POST | `/api/users` | Crear usuario |
-| GET | `/api/users/:id` | Obtener usuario |
-
-## Decisiones técnicas
-
-- **RAG sin infra externa**: MVP usa cosine similarity sobre vectors almacenados en SQLite como JSON. Suficiente para < 10k chunks. Migrar a pgvector/Pinecone si escala.
-- **Sin LangChain**: overhead innecesario para el caso. OpenAI API directo + retrieval custom.
-- **Embeddings en SQLite**: vector como TEXT (JSON array). Búsqueda en JS. Simple y portable.
-- **Chunking por párrafos**: split natural, ~500 tokens por chunk, overlap de 50 tokens.
-- **Grounding estricto**: el LLM NO inventa enseñanzas. Solo responde con contexto recuperado.
-- **Personalidad fiel**: system prompt calibrado al tono y estilo de Patri Roviano.
-- **Puerto 3001**: para no colisionar con Astral (3000).
-- **Mismo stack que Astral**: facilita reutilización y mantenimiento.
+| Concepto | Costo |
+|----------|-------|
+| System prompt (~25K tokens) por query | $0.004 |
+| 1,000 queries/mes | ~$4 |
+| 10,000 queries/mes | ~$40 |
 
 ## Principio fundamental
 
 > La IA NO inventa enseñanzas.
-> Todas las respuestas deben estar fundamentadas en conocimiento recuperado.
-> Si no hay contexto relevante, lo dice honestamente.
-
-## RAG Pipeline
-
-```
-Query del usuario
-      │
-      ▼
-  Embedding (text-embedding-3-small)
-      │
-      ▼
-  Cosine Similarity vs knowledge_chunks
-      │
-      ▼
-  Top-K chunks (k=5)
-      │
-      ▼
-  System Prompt = Persona Patri + Chunks relevantes
-      │
-      ▼
-  GPT-4o-mini genera respuesta grounded
-      │
-      ▼
-  Respuesta al usuario (con referencias)
-```
-
-## Patrón de respuesta del mentor
-
-Las respuestas siguen un patrón de mentoría:
-
-1. **Reflejo**: refleja la situación del usuario
-2. **Patrón**: identifica el patrón emocional/relacional
-3. **Enseñanza**: explica la dinámica según Patri
-4. **Guía**: sugiere reflexión o acción
-
-## Roadmap
-
-### Fase 1 — MVP Backend (actual)
-- [x] Scaffold proyecto
-- [ ] RAG pipeline (embed + retrieve)
-- [ ] Knowledge ingestion endpoint
-- [ ] Chat endpoint con RAG
-- [ ] System prompt alineado a Patri
-
-### Fase 2 — Contenido
-- [ ] Investigar fuentes públicas de Patri
-- [ ] Transcribir videos clave
-- [ ] Curar y estructurar metodología
-- [ ] Ingestar knowledge base
-
-### Fase 3 — Frontend
-- [ ] Chat UI (similar a Astral)
-- [ ] Branding Patri Roviano
-- [ ] Onboarding simple
-
-### Fase 4 — Evolución
-- [ ] Memoria de usuario (context history)
-- [ ] Voz (ElevenLabs)
-- [ ] Diagnóstico de situación
-- [ ] Tracking de patrones emocionales
+> Solo responde basada en la metodología cargada.
+> Si no tiene info, lo dice honestamente.

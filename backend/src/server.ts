@@ -1,9 +1,8 @@
 /**
  * Patri Mentor — Backend
- * Node.js / TypeScript / Fastify
  *
- * AI Mentor basado en las enseñanzas de Patri Roviano.
- * RAG pipeline: embeddings + cosine similarity + GPT-4o-mini.
+ * Phase 1: Context stuffing (methodology in system prompt).
+ * Phase 3 (future): RAG pipeline.
  */
 
 import path from "node:path";
@@ -14,7 +13,6 @@ import fastifyStatic from "@fastify/static";
 import { initDb } from "./db.js";
 import { healthRoutes } from "./routes/health.js";
 import { chatRoutes } from "./routes/chat.js";
-import { knowledgeRoutes } from "./routes/knowledge.js";
 import { userRoutes } from "./routes/users.js";
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY ?? "";
@@ -36,7 +34,6 @@ await app.register(
   async (api) => {
     await api.register(healthRoutes);
     await api.register(chatRoutes);
-    await api.register(knowledgeRoutes);
     await api.register(userRoutes);
   },
   { prefix: "/api" },

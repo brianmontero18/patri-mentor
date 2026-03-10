@@ -22,10 +22,10 @@ export async function chatRoutes(app: FastifyInstance) {
     if (userId) {
       const lastUser = [...messages].reverse().find((m) => m.role === "user");
       if (lastUser) await saveMessage(userId, "user", lastUser.content);
-      await saveMessage(userId, "assistant", result.reply, result.sources.map((s) => s.title));
+      await saveMessage(userId, "assistant", result);
     }
 
-    return { reply: result.reply, sources: result.sources };
+    return { reply: result };
   });
 
   app.post<{ Body: ChatBody }>("/chat/stream", async (request, reply) => {
@@ -42,22 +42,18 @@ export async function chatRoutes(app: FastifyInstance) {
     });
 
     let fullReply = "";
-    let sources: Array<{ title: string; sourceUrl: string | null; score: number }> = [];
 
-    for await (const event of runMentorStream(messages, apiKey)) {
-      if (event.type === "chunk") {
-        fullReply += event.content;
-        reply.raw.write(`data: ${JSON.stringify({ content: event.content })}\n\n`);
-      } else if (event.type === "done") {
-        sources = event.sources;
-        reply.raw.write(`data: ${JSON.stringify({ done: true, sources: event.sources })}\n\n`);
-      }
+    for await (const chunk of runMentorStream(messages, apiKey)) {
+      fullReply += chunk;
+      reply.raw.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
     }
+
+    reply.raw.write(`data: ${JSON.stringify({ done: true })}\n\n`);
 
     if (userId) {
       const lastUser = [...messages].reverse().find((m) => m.role === "user");
       if (lastUser) await saveMessage(userId, "user", lastUser.content);
-      await saveMessage(userId, "assistant", fullReply, sources.map((s) => s.title));
+      await saveMessage(userId, "assistant", fullReply);
     }
 
     reply.raw.end();
